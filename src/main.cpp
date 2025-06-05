@@ -30,8 +30,8 @@
 #include "RainSensor.h"
 #include <Chirale_TensorFlowLite.h>
 
-constexpr char WIFI_SSID[] = "ATFox";
-constexpr char WIFI_PASSWORD[] = "Trananhtai272";
+constexpr char WIFI_SSID[] = "Duc Dat";
+constexpr char WIFI_PASSWORD[] = "03012013";
 
 constexpr char TOKEN[] = "hfcqxw9o73bh4t80er0w";
 
@@ -438,16 +438,7 @@ void lightSensorTask(void *pvParameters) {
 
 void moisSensorTask(void *pvParameters) {
   while (true) {
-    float moistureValue = readSMS();
-    if (count < 10) {
-      input_data[count++] = moistureValue;
-    } else {
-      // Shift left
-      for (int i = 0; i < 9; ++i) {
-        input_data[i] = input_data[i + 1];
-      }
-      input_data[9] = moistureValue;
-    }
+    float moistureValue = 25.0 + random(-150, 150) / 100.0;
 
     Serial.print("Input: ");
     for (int i = 0; i < count; i++) {
@@ -467,6 +458,16 @@ void moisSensorTask(void *pvParameters) {
       }
     } else {
       Serial.println("Waiting to collect 10 values...");
+    }
+
+    if (count < 10) {
+      input_data[count++] = moistureValue;
+    } else {
+      // Shift left
+      for (int i = 0; i < 9; ++i) {
+        input_data[i] = input_data[i + 1];
+      }
+      input_data[9] = moistureValue;
     }
 
     Serial.print("[INFO]: Soil Moisture Sensor value: ");
