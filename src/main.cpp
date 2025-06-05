@@ -438,7 +438,7 @@ void lightSensorTask(void *pvParameters) {
 
 void moisSensorTask(void *pvParameters) {
   while (true) {
-    float moistureValue = 25.0 + random(-150, 150) / 100.0;
+    float moistureValue = readSMS();
 
     Serial.print("Input: ");
     for (int i = 0; i < count; i++) {
