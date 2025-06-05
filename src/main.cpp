@@ -460,6 +460,11 @@ void moisSensorTask(void *pvParameters) {
       float result = predictNextValue(input_data, 10);
       Serial.print("Predicted value 11: ");
       Serial.println(result, 2);
+      if (abs(moistureValue - result) < 5.0) {
+        tb.sendTelemetryData("moisture", moistureValue);
+      } else {
+        Serial.println("[WARN]: Prediction is far from actual value, then skip the value.");
+      }
     } else {
       Serial.println("Waiting to collect 10 values...");
     }
@@ -468,7 +473,6 @@ void moisSensorTask(void *pvParameters) {
     Serial.print(moistureValue);
     Serial.println("%");
 
-    // tb.sendTelemetryData("moisture", moistureValue);
 
     vTaskDelay(2000 / portTICK_PERIOD_MS); //2s delay
   }
@@ -489,6 +493,7 @@ void moisModbusSensorTask(void *pvParameters) {
     vTaskDelay(2000 / portTICK_PERIOD_MS); //2s delay
   }
 }
+#endif // MODBUS_USE
 
 void rainSensorTask(void *pvParameters) {
   while (true) {
@@ -503,7 +508,6 @@ void rainSensorTask(void *pvParameters) {
     vTaskDelay(2000 / portTICK_PERIOD_MS); //2s delay
   }
 }
-#endif // MODBUS_USE
 
 void tbLoopTask(void *pvParameters) {
   while (true) {
@@ -531,12 +535,12 @@ void setup() {
   soilSensor.begin(4800);
 #endif
 
-  // xTaskCreate(connectToWiFi,      "connectToWiFi",      4096, NULL, 1, NULL);
-  // xTaskCreate(coreIoTConnectTask, "coreIoTConnectTask", 12288, NULL, 1, NULL);
-  // xTaskCreate(sendAtributesTask,  "sendAtributesTask",  4096, NULL, 2, NULL);
-  // xTaskCreate(sendTelemetryTask,  "sendTelemetryTask",  4096, NULL, 2, NULL);
-  // xTaskCreate(tbLoopTask,         "tbLoopTask",         8192, NULL, 1, NULL);
-  // xTaskCreate(updateFirmwareTask, "updateFirmwareTask", 12288, NULL, 2, NULL);
+  xTaskCreate(connectToWiFi,      "connectToWiFi",      4096, NULL, 1, NULL);
+  xTaskCreate(coreIoTConnectTask, "coreIoTConnectTask", 12288, NULL, 1, NULL);
+  xTaskCreate(sendAtributesTask,  "sendAtributesTask",  4096, NULL, 2, NULL);
+  xTaskCreate(sendTelemetryTask,  "sendTelemetryTask",  4096, NULL, 2, NULL);
+  xTaskCreate(tbLoopTask,         "tbLoopTask",         8192, NULL, 1, NULL);
+  xTaskCreate(updateFirmwareTask, "updateFirmwareTask", 12288, NULL, 2, NULL);
 #ifdef MODBUS_USE
   xTaskCreate(moisModbusSensorTask,     "moisModbusSensorTask",     2048, NULL, 2, NULL);
 #else
