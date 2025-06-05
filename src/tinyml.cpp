@@ -9,8 +9,8 @@
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 
-const float max_val = 26.70200963609803;
-const float min_val = 23.218951650506252;
+const float min_val = 54.34049356454897;
+const float max_val = 57.816880137634946;
 constexpr int kTensorArenaSize = 20000;
 alignas(16) uint8_t tensor_arena[kTensorArenaSize];
 

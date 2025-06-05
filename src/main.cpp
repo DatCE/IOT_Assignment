@@ -1,7 +1,3 @@
-#include "ExternalLedControl.h"
-#include "PumpControl.h"
-#include <Arduino.h>
-#include "tinyml.h"
 
 #define LED_PIN 48
 #define SDA_PIN GPIO_NUM_11
@@ -9,20 +5,33 @@
 #define LIGHT_SENSOR_PIN 1 // A0-LUX
 #define MOIS_SENSOR_PIN  3 // A2-MOISTURE
 
+// #define MODBUS_USE // TODO: Uncomment this line to use MODBUS protocol for Soil Moisture Sensor
+#define DE_PIN  17 // DE/RE Pin of MAX485-TTL-to-RS485 module 
+// RXD2    16
+// TXD2    15
+
 #include <WiFi.h>
 #include <string.h>
 #include <Arduino_MQTT_Client.h>
 #include <ThingsBoard.h>
-#include "DHT20.h"
-#include "Wire.h"
+#include <WiFiClientSecure.h>
+#include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <Adafruit_NeoPixel.h>
 #include <HTTPClient.h>
 #include <Update.h>
-#include <WiFiClientSecure.h>
+#include "ExternalLedControl.h"
+#include "DHT20.h"
+#include "Wire.h"
+#include "PumpControl.h"
+#include "tinyml.h"
+#include "SoilMoistureSensor.h"
+#include "SMModbusSensor.h"
+#include "RainSensor.h"
+#include <Chirale_TensorFlowLite.h>
 
-constexpr char WIFI_SSID[] = "Duc Dat";
-constexpr char WIFI_PASSWORD[] = "03012013";
+constexpr char WIFI_SSID[] = "ATFox";
+constexpr char WIFI_PASSWORD[] = "Trananhtai272";
 
 constexpr char TOKEN[] = "hfcqxw9o73bh4t80er0w";
 
@@ -101,6 +110,11 @@ String currentFwUrl;
 WiFiClient wifiClient;
 Arduino_MQTT_Client mqttClient(wifiClient);
 ThingsBoard tb(mqttClient, MAX_MESSAGE_SIZE);
+
+#ifdef MODBUS_USE
+  HardwareSerial ModbusSerial(2);
+  SoilSensor soilSensor(ModbusSerial, DE_PIN);
+#endif // MODBUS_USE
 
 DHT20 dht20;
 //############RPC############//
@@ -424,8 +438,7 @@ void lightSensorTask(void *pvParameters) {
 
 void moisSensorTask(void *pvParameters) {
   while (true) {
-    int rawMoistureValue = analogRead(MOIS_SENSOR_PIN);
-    float moistureValue = (rawMoistureValue * 1.0 / 4095.0) * 100;
+    float moistureValue = readSMS();
     if (count < 10) {
       input_data[count++] = moistureValue;
     } else {
@@ -451,13 +464,46 @@ void moisSensorTask(void *pvParameters) {
       Serial.println("Waiting to collect 10 values...");
     }
 
-    Serial.print("Moisture Sensor Value: ");
+    Serial.print("[INFO]: Soil Moisture Sensor value: ");
     Serial.print(moistureValue);
     Serial.println("%");
-    tb.sendTelemetryData("moisture", moistureValue);
+
+    // tb.sendTelemetryData("moisture", moistureValue);
+
     vTaskDelay(2000 / portTICK_PERIOD_MS); //2s delay
   }
 }
+
+#ifdef MODBUS_USE
+void moisModbusSensorTask(void *pvParameters) {
+  while (true) {
+    float moisture, temp;
+    uint16_t ec;
+
+    if (soilSensor.readSensor(moisture, temp, ec)) {
+        Serial.printf("[INFO]: Moisture: %.1f %% | Temp: %.1f °C | EC: %u uS/cm\n", moisture, temp, ec);
+    } else {
+        Serial.println("[WARN]: Failed to read sensor.");
+    }
+
+    vTaskDelay(2000 / portTICK_PERIOD_MS); //2s delay
+  }
+}
+
+void rainSensorTask(void *pvParameters) {
+  while (true) {
+
+    float rainValue = readRainStatus();
+    Serial.print("[INFO]: Rain sensor value: ");
+    Serial.print(rainValue);
+    Serial.println("%");
+    
+    // tb.sendTelemetryData("rain", rainValue);
+
+    vTaskDelay(2000 / portTICK_PERIOD_MS); //2s delay
+  }
+}
+#endif // MODBUS_USE
 
 void tbLoopTask(void *pvParameters) {
   while (true) {
@@ -480,17 +526,27 @@ void setup() {
 
   Wire.begin(SDA_PIN, SCL_PIN);
   dht20.begin();
-  
-  xTaskCreate(connectToWiFi,      "connectToWiFi",      4096, NULL, 1, NULL);
-  xTaskCreate(coreIoTConnectTask, "coreIoTConnectTask", 12288, NULL, 1, NULL);
-  xTaskCreate(sendAtributesTask,  "sendAtributesTask",  4096, NULL, 2, NULL);
-  xTaskCreate(sendTelemetryTask,  "sendTelemetryTask",  4096, NULL, 2, NULL);
-  xTaskCreate(tbLoopTask,         "tbLoopTask",         8192, NULL, 1, NULL);
-  xTaskCreate(neoPixelTask,       "neoPixelTask",       2048, NULL, 2, NULL);
-  xTaskCreate(updateFirmwareTask, "updateFirmwareTask", 12288, NULL, 2, NULL);
-  // xTaskCreate(lightSensorTask,    "lightSensorTask",    2048, NULL, 2, NULL);
-  // xTaskCreate(moisSensorTask,     "moisSensorTask",     2048, NULL, 2, NULL);
+
+#ifdef MODBUS_USE
+  soilSensor.begin(4800);
+#endif
+
+  // xTaskCreate(connectToWiFi,      "connectToWiFi",      4096, NULL, 1, NULL);
+  // xTaskCreate(coreIoTConnectTask, "coreIoTConnectTask", 12288, NULL, 1, NULL);
+  // xTaskCreate(sendAtributesTask,  "sendAtributesTask",  4096, NULL, 2, NULL);
+  // xTaskCreate(sendTelemetryTask,  "sendTelemetryTask",  4096, NULL, 2, NULL);
+  // xTaskCreate(tbLoopTask,         "tbLoopTask",         8192, NULL, 1, NULL);
+  // xTaskCreate(updateFirmwareTask, "updateFirmwareTask", 12288, NULL, 2, NULL);
+#ifdef MODBUS_USE
+  xTaskCreate(moisModbusSensorTask,     "moisModbusSensorTask",     2048, NULL, 2, NULL);
+#else
+  xTaskCreate(moisSensorTask,     "moisSensorTask",     2048, NULL, 2, NULL);
+#endif // MODBUS_USE
+  xTaskCreate(rainSensorTask,     "rainSensorTask",     2048, NULL, 2, NULL);
   xTaskCreate(pumpTask,           "pumpTask",           2048, NULL, 2, NULL);
+  
+  // xTaskCreate(lightSensorTask,    "lightSensorTask",    2048, NULL, 2, NULL);
+  xTaskCreate(neoPixelTask,       "neoPixelTask",       2048, NULL, 2, NULL);
 }
 
 void loop() {

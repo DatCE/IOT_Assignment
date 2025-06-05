@@ -6,7 +6,7 @@ from tensorflow.keras.losses import MeanSquaredError
 from sklearn.preprocessing import MinMaxScaler
 
 # 1. Tạo dữ liệu giả (nhiệt độ có nhiễu)
-data = 25 + np.random.normal(0, 0.5, 3000)
+data = 56 + np.random.normal(0, 0.5, 3000)
 
 # 2. Scale dữ liệu
 scaler = MinMaxScaler()
